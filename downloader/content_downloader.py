@@ -2,6 +2,7 @@ import os
 import re
 import time
 import requests
+from tqdm import tqdm
 
 from utils.file_utils import sanitize_filename
 from downloader.track_downloader import TrackDownloader
@@ -56,10 +57,27 @@ class ContentDownloader:
 
             print(f"Скачиваю альбом: {album_name}")
 
+            # Собираем все треки для progress bar
+            all_tracks = []
             for volume_idx, volume in enumerate(album.volumes):
                 tracks_in_volume = len(volume)
                 for track in volume:
+                    all_tracks.append((track, tracks_in_volume, total_discs))
+
+            # Скачиваем с progress bar
+            with tqdm(
+                total=len(all_tracks),
+                desc=f"💿 Альбом: {album_name}",
+                unit=" трек",
+                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}, {rate_fmt}]',
+                ncols=100,
+                colour='blue',
+                ascii=' ░▒▓█',
+                dynamic_ncols=True
+            ) as pbar:
+                for track, tracks_in_volume, total_discs in all_tracks:
                     self.track_downloader.download_track(track, album_dir, album_name, tracks_in_volume, total_discs)
+                    pbar.update(1)
 
             print(f"Альбом '{album_name}' успешно скачан в {album_dir}")
 
@@ -115,6 +133,8 @@ class ContentDownloader:
 
         print(f"Скачиваю плейлист: {playlist_name}")
 
+        # Собираем все треки для progress bar
+        tracks_to_download = []
         for track_item in playlist.tracks:
             try:
                 if hasattr(track_item, 'track') and track_item.track:
@@ -122,12 +142,38 @@ class ContentDownloader:
                 else:
                     track_id = f"{track_item.id}:{track_item.album_id}"
                     track = self.client.tracks(track_id)[0]
-
                 if track:
-                    self.track_downloader.download_track(track, playlist_dir)
+                    tracks_to_download.append(track)
             except Exception as e:
-                print(f"Ошибка при скачивании трека из плейлиста: {e}")
+                print(f"Ошибка при получении трека из плейлиста: {e}")
                 continue
+
+        # Скачиваем с progress bar
+        with tqdm(
+            total=len(tracks_to_download),
+            desc=f"🎶 Плейлист: {playlist_name}",
+            unit=" трек",
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}, {rate_fmt}]',
+            ncols=100,
+            colour='magenta',
+            ascii=' ░▒▓█',
+            dynamic_ncols=True
+        ) as pbar:
+            for track_item in playlist.tracks:
+                try:
+                    if hasattr(track_item, 'track') and track_item.track:
+                        track = track_item.track
+                    else:
+                        track_id = f"{track_item.id}:{track_item.album_id}"
+                        track = self.client.tracks(track_id)[0]
+
+                    if track:
+                        self.track_downloader.download_track(track, playlist_dir)
+                        pbar.update(1)
+                except Exception as e:
+                    print(f"Ошибка при скачивании трека из плейлиста: {e}")
+                    pbar.update(1)  # Обновляем прогресс даже при ошибке
+                    continue
 
         print(f"Плейлист '{playlist_name}' успешно скачан в {playlist_dir}")
 
@@ -179,10 +225,27 @@ class ContentDownloader:
 
                             print(f"\nСкачиваю альбом: {album_name}")
 
+                            # Собираем все треки для progress bar
+                            all_tracks = []
                             for volume_idx, volume in enumerate(full_album.volumes):
                                 tracks_in_volume = len(volume)
                                 for track in volume:
+                                    all_tracks.append((track, tracks_in_volume, total_discs))
+
+                            # Скачиваем с progress bar
+                            with tqdm(
+                                total=len(all_tracks),
+                                desc=f"💿 Альбом: {album_name}",
+                                unit=" трек",
+                                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}, {rate_fmt}]',
+                                ncols=100,
+                                colour='blue',
+                                ascii=' ░▒▓█',
+                                dynamic_ncols=True
+                            ) as pbar:
+                                for track, tracks_in_volume, total_discs in all_tracks:
                                     self.track_downloader.download_track(track, album_dir_path, album_name, tracks_in_volume, total_discs)
+                                    pbar.update(1)
 
                             print(f"Альбом '{album_name}' скачан")
 
@@ -198,12 +261,25 @@ class ContentDownloader:
 
                 singles_dir = os.path.join(artist_dir, "Singles & Other Tracks")
 
-                for track in tracks.tracks:
-                    try:
-                        self.track_downloader.download_track(track, singles_dir)
-                    except Exception as e:
-                        print(f"Ошибка при скачивании трека {track.title}: {e}")
-                        continue
+                # Скачиваем с progress bar
+                with tqdm(
+                    total=len(tracks.tracks),
+                    desc="🎵 Отдельные треки",
+                    unit=" трек",
+                    bar_format='{desc}: {percentage:3.0f}%|{bar}| {n}/{total} [{elapsed}<{remaining}, {rate_fmt}]',
+                    ncols=100,
+                    colour='yellow',
+                    ascii=' ░▒▓█',
+                    dynamic_ncols=True
+                ) as pbar:
+                    for track in tracks.tracks:
+                        try:
+                            self.track_downloader.download_track(track, singles_dir)
+                            pbar.update(1)
+                        except Exception as e:
+                            print(f"Ошибка при скачивании трека {track.title}: {e}")
+                            pbar.update(1)  # Обновляем прогресс даже при ошибке
+                            continue
 
             print(f"\nВсе треки артиста '{artist_name}' успешно скачаны в {artist_dir}")
 

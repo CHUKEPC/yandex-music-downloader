@@ -9,6 +9,7 @@ import typing
 import random
 import time
 from Crypto.Cipher import AES
+from tqdm import tqdm
 
 from utils.file_utils import sanitize_filename, detect_audio_format
 from audio.audio_processor import AudioProcessor, UnsupportedAudioFormatError
@@ -24,6 +25,32 @@ class TrackDownloader:
     def __init__(self, client, audio_quality="hq"):
         self.client = client
         self.audio_quality = audio_quality
+
+    def _download_file_with_progress(self, url, file_path, desc="Скачивание"):
+        """Скачивает файл с отображением прогресса"""
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+
+        total_size = int(response.headers.get('content-length', 0))
+
+        # Если размер неизвестен, используем None для неопределенного прогресса
+        with open(file_path, 'wb') as f, tqdm(
+            desc=f"⬇️  {desc}",
+            total=total_size if total_size > 0 else None,
+            unit='B',
+            unit_scale=True,
+            unit_divisor=1024,
+            leave=False,
+            bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]',
+            ncols=100,
+            colour='green',
+            ascii=' ░▒▓█',
+            dynamic_ncols=True
+        ) as pbar:
+            for chunk in response.iter_content(chunk_size=8192):
+                if chunk:
+                    f.write(chunk)
+                    pbar.update(len(chunk))
 
     def _decrypt_data(self, data: bytes, key: str) -> bytes:
         """Расшифровывает данные используя AES-CTR
@@ -102,8 +129,39 @@ class TrackDownloader:
             # Выбираем случайный URL
             download_url = random.choice(urls)
 
-            # Скачиваем файл используя метод клиента
-            track_data = self.client.request.retrieve(download_url)
+            # Скачиваем файл с progress bar
+            artist_name = "Трек"
+            try:
+                # Пытаемся получить имя артиста для отображения в progress bar
+                track_info = self.client.tracks(track_id)[0]
+                artist_name = ', '.join(artist.name for artist in track_info.artists)
+            except:
+                pass
+
+            # Скачиваем файл с progress bar
+            response = requests.get(download_url, stream=True)
+            response.raise_for_status()
+
+            total_size = int(response.headers.get('content-length', 0))
+            track_data = b''
+
+            with tqdm(
+                desc=f"🎵 {artist_name}",
+                total=total_size,
+                unit='B',
+                unit_scale=True,
+                unit_divisor=1024,
+                leave=False,
+                bar_format='{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]',
+                ncols=100,
+                colour='cyan',
+                ascii=' ░▒▓█',
+                dynamic_ncols=True
+            ) as pbar:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        track_data += chunk
+                        pbar.update(len(chunk))
 
             # Проверяем нужна ли расшифровка
             # Если transport = "encraw" и есть поле "key", нужно расшифровать
@@ -187,7 +245,7 @@ class TrackDownloader:
         artist = ', '.join(artist.name for artist in track.artists)
         title = track.title
 
-        print(f"Скачиваю: {artist} - {title}")
+        print(f"\nСкачиваю: {artist} - {title}")
         # Специальная обработка для lossless
         if self.audio_quality == "lossless":
             # Пробуем скачать через прямой API
@@ -206,9 +264,40 @@ class TrackDownloader:
                     print(f"Ошибка: Не удалось получить информацию о скачивании для трека '{title}'")
                     return
 
-                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                    codec_info.download(temp_file.name)
-                    temp_file_path = temp_file.name
+                # Пытаемся получить URL для скачивания с progress bar
+                download_url = None
+                try:
+                    download_info_list = track.get_download_info()
+                    if download_info_list:
+                        # Находим соответствующий download_info
+                        for info in download_info_list:
+                            if info.codec == codec_info.codec and info.bitrate_in_kbps == codec_info.bitrate_in_kbps:
+                                # Пытаемся получить URL из download_info
+                                if hasattr(info, 'download_info'):
+                                    download_info_dict = info.download_info
+                                    # Проверяем разные варианты структуры данных
+                                    if isinstance(download_info_dict, dict):
+                                        urls = download_info_dict.get('urls', [])
+                                        if urls:
+                                            download_url = urls[0] if isinstance(urls, list) else None
+                                    elif hasattr(download_info_dict, 'urls'):
+                                        urls = download_info_dict.urls
+                                        if urls:
+                                            download_url = urls[0] if isinstance(urls, list) else None
+                                break
+                except Exception:
+                    # Если не удалось получить URL, используем стандартный метод
+                    pass
+
+                if download_url:
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        self._download_file_with_progress(download_url, temp_file.name, f"Скачивание: {artist} - {title}")
+                        temp_file_path = temp_file.name
+                else:
+                    # Fallback на стандартный метод без progress bar
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        codec_info.download(temp_file.name)
+                        temp_file_path = temp_file.name
 
                 file_ext = detect_audio_format(temp_file_path)
                 temp_file_with_ext = temp_file_path + file_ext
@@ -236,9 +325,40 @@ class TrackDownloader:
                 print(f"Ошибка: Не удалось получить информацию о скачивании для трека '{title}'")
                 return
 
-            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                codec_info.download(temp_file.name)
-                temp_file_path = temp_file.name
+            # Пытаемся получить URL для скачивания с progress bar
+            download_url = None
+            try:
+                download_info_list = track.get_download_info()
+                if download_info_list:
+                    # Находим соответствующий download_info
+                    for info in download_info_list:
+                        if info.codec == codec_info.codec and info.bitrate_in_kbps == codec_info.bitrate_in_kbps:
+                            # Пытаемся получить URL из download_info
+                            if hasattr(info, 'download_info'):
+                                download_info_dict = info.download_info
+                                # Проверяем разные варианты структуры данных
+                                if isinstance(download_info_dict, dict):
+                                    urls = download_info_dict.get('urls', [])
+                                    if urls:
+                                        download_url = urls[0] if isinstance(urls, list) else None
+                                elif hasattr(download_info_dict, 'urls'):
+                                    urls = download_info_dict.urls
+                                    if urls:
+                                        download_url = urls[0] if isinstance(urls, list) else None
+                            break
+            except Exception:
+                # Если не удалось получить URL, используем стандартный метод
+                pass
+
+            if download_url:
+                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                    self._download_file_with_progress(download_url, temp_file.name, f"Скачивание: {artist} - {title}")
+                    temp_file_path = temp_file.name
+            else:
+                # Fallback на стандартный метод без progress bar
+                with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                    codec_info.download(temp_file.name)
+                    temp_file_path = temp_file.name
 
             file_ext = detect_audio_format(temp_file_path)
             temp_file_with_ext = temp_file_path + file_ext
@@ -271,4 +391,4 @@ class TrackDownloader:
 
         output_path = os.path.join(output_dir, filename)
         shutil.move(temp_file_path, output_path)
-        print(f"Сохранено: {output_path}")
+        print(f"\nСохранено: {output_path}")
