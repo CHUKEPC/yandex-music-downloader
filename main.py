@@ -5,7 +5,7 @@ from downloader.content_downloader import ContentDownloader
 
 def main():
     """Главная функция"""
-    print("Скачиватель треков с Яндекс Музыки")
+    print("YandexMusicDownloader")
     print("=" * 50)
 
     # Инициализация клиента
