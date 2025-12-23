@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.log
+logs/
+cache/
+music/
+env/
+.env
+.venv/
+build/
+dist/
+*.egg-info/

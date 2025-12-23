@@ -98,6 +98,32 @@ python main.py
 - Скорости скачивания
 - Оставшемся времени
 
+## 🚢 Запуск в Docker
+
+1. Соберите образ:
+```bash
+docker build -t yandex-music-downloader .
+```
+
+2. Запустите контейнер (пример для PowerShell, под CMD используйте `%cd%` вместо `$(pwd)`):
+```bash
+docker run --rm -it ^
+  -e YANDEX_MUSIC_TOKEN="ваш_токен" ^
+  -e AUDIO_QUALITY="hq" ^
+  -v "$(pwd)/music:/app/music" ^
+  -v "$(pwd)/logs:/app/logs" ^
+  -v "$(pwd)/cache:/app/cache" ^
+  yandex-music-downloader
+```
+
+Доступные переменные окружения (все имеют значения по умолчанию из `config.py`):
+- `YANDEX_MUSIC_TOKEN` — токен Яндекс.Музыки (обязательно задать для работы)
+- `AUDIO_QUALITY` — `lossless` / `hq` / `nq`
+- `DOWNLOAD_DIR` — папка для загрузок (по умолчанию `/app/music`)
+- `LOGGING_ENABLED`, `LOG_FILE`, `LOG_LEVEL`
+- `METADATA_CACHE_ENABLED`, `METADATA_CACHE_FILE`, `METADATA_CACHE_TTL_HOURS`
+- `MAX_CONCURRENT_DOWNLOADS`
+
 ## 📂 Структура проекта
 
 ```
