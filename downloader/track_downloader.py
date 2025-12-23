@@ -1,3 +1,4 @@
+import logging
 import os
 import tempfile
 import shutil
@@ -14,6 +15,9 @@ from tqdm import tqdm
 from utils.file_utils import sanitize_filename, detect_audio_format
 from audio.audio_processor import AudioProcessor, UnsupportedAudioFormatError
 from yandex_music.utils.sign_request import DEFAULT_SIGN_KEY
+
+
+logger = logging.getLogger(__name__)
 
 
 class TrackDownloader:
@@ -236,8 +240,9 @@ class TrackDownloader:
             # По умолчанию максимальное качество
             return download_info[0]
 
-        except Exception as e:
-            print(f"Ошибка при выборе кодека: {e}")
+        except Exception:
+            logger.exception("Ошибка при выборе кодека")
+            print("Ошибка при выборе кодека")
             return None
 
     def download_track(self, track, output_dir, album_name=None, total_tracks=None, total_discs=None):
@@ -246,6 +251,7 @@ class TrackDownloader:
         title = track.title
 
         print(f"\nСкачиваю: {artist} - {title}")
+        logger.info("Начало скачивания: %s - %s (качество: %s)", artist, title, self.audio_quality)
         # Специальная обработка для lossless
         if self.audio_quality == "lossless":
             # Пробуем скачать через прямой API
@@ -261,6 +267,7 @@ class TrackDownloader:
                 codec_info = self._get_best_codec(track)
 
                 if not codec_info:
+                    logger.error("Не удалось получить информацию о скачивании для трека '%s'", title)
                     print(f"Ошибка: Не удалось получить информацию о скачивании для трека '{title}'")
                     return
 
@@ -322,6 +329,7 @@ class TrackDownloader:
             codec_info = self._get_best_codec(track)
 
             if not codec_info:
+                logger.error("Не удалось получить информацию о скачивании для трека '%s'", title)
                 print(f"Ошибка: Не удалось получить информацию о скачивании для трека '{title}'")
                 return
 
@@ -378,6 +386,7 @@ class TrackDownloader:
         try:
             AudioProcessor.process_audio(temp_file_path, track, cover_content, album_name, total_tracks, total_discs)
         except UnsupportedAudioFormatError as e:
+            logger.error("Неподдерживаемый формат: %s", e)
             print(f"Ошибка: {e}")
             os.unlink(temp_file_path)
             return
@@ -391,4 +400,5 @@ class TrackDownloader:
 
         output_path = os.path.join(output_dir, filename)
         shutil.move(temp_file_path, output_path)
+        logger.info("Сохранено: %s", output_path)
         print(f"\nСохранено: {output_path}")

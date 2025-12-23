@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import time
@@ -6,6 +7,9 @@ from tqdm import tqdm
 
 from utils.file_utils import sanitize_filename
 from downloader.track_downloader import TrackDownloader
+
+
+logger = logging.getLogger(__name__)
 
 
 class ContentDownloader:
@@ -21,12 +25,14 @@ class ContentDownloader:
         pattern = r"track/(\d+)"
         match = re.search(pattern, url)
         if not match:
+            logger.error("Неверная ссылка на трек: %s", url)
             print("Неверная ссылка на трек")
             return
 
         track_id = match.group(1)
         track = self.client.tracks(track_id)[0]
 
+        logger.info("Скачивание трека %s", url)
         self.track_downloader.download_track(track, self.config.DOWNLOAD_DIR)
 
     def download_album(self, url):
@@ -34,12 +40,14 @@ class ContentDownloader:
         pattern = r"album/(\d+)"
         match = re.search(pattern, url)
         if not match:
+            logger.error("Неверная ссылка на альбом: %s", url)
             print("Неверная ссылка на альбом")
             return
 
         album_id = match.group(1)
         album = self.client.albums_with_tracks(album_id)
         album_name = album.title
+        logger.info("Скачивание альбома '%s' (%s)", album_name, url)
 
         total_tracks_all = sum(len(volume) for volume in album.volumes)
         total_discs = len(album.volumes)
@@ -51,6 +59,7 @@ class ContentDownloader:
                 for track in volume:
                     self.track_downloader.download_track(track, self.config.DOWNLOAD_DIR, album_name, total_tracks_all, total_discs)
             print(f"Сингл '{album_name}' успешно скачан в {self.config.DOWNLOAD_DIR}")
+            logger.info("Сингл '%s' скачан (%s)", album_name, album_id)
         else:
             safe_album_name = sanitize_filename(album_name)
             album_dir = os.path.join(self.config.DOWNLOAD_DIR, safe_album_name)
@@ -78,6 +87,7 @@ class ContentDownloader:
                 for track, tracks_in_volume, total_discs in all_tracks:
                     self.track_downloader.download_track(track, album_dir, album_name, tracks_in_volume, total_discs)
                     pbar.update(1)
+            logger.info("Альбом '%s' скачан (%s)", album_name, album_id)
 
             print(f"Альбом '{album_name}' успешно скачан в {album_dir}")
 
@@ -86,6 +96,7 @@ class ContentDownloader:
         pattern = r"/(?:playlist/([^/]+)|users/([^/]+)/playlists)/(\d+)|(?:/playlists/([0-9a-fA-F-]+)|playlists/lk.([0-9a-fA-F-]+))"
         match = re.search(pattern, url)
         if not match:
+            logger.error("Неверная ссылка на плейлист: %s", url)
             print("Неверная ссылка на плейлист")
             return
 
@@ -124,6 +135,7 @@ class ContentDownloader:
         try:
             playlist = self.client.users_playlists(kind=playlist_id, user_id=playlist_user)
         except:
+            logger.exception("Ошибка при запросе плейлиста %s", url)
             print("Скачать данный плейлист невозможно, скорее всего в нём находятся треки, загруженные пользователем вручную")
             return
 
@@ -132,6 +144,7 @@ class ContentDownloader:
         playlist_dir = os.path.join(self.config.DOWNLOAD_DIR, safe_playlist_name)
 
         print(f"Скачиваю плейлист: {playlist_name}")
+        logger.info("Скачивание плейлиста '%s' (%s)", playlist_name, url)
 
         # Собираем все треки для progress bar
         tracks_to_download = []
@@ -145,6 +158,7 @@ class ContentDownloader:
                 if track:
                     tracks_to_download.append(track)
             except Exception as e:
+                logger.warning("Ошибка при получении трека из плейлиста: %s", e)
                 print(f"Ошибка при получении трека из плейлиста: {e}")
                 continue
 
@@ -171,17 +185,20 @@ class ContentDownloader:
                         self.track_downloader.download_track(track, playlist_dir)
                         pbar.update(1)
                 except Exception as e:
+                    logger.warning("Ошибка при скачивании трека из плейлиста: %s", e)
                     print(f"Ошибка при скачивании трека из плейлиста: {e}")
                     pbar.update(1)  # Обновляем прогресс даже при ошибке
                     continue
 
         print(f"Плейлист '{playlist_name}' успешно скачан в {playlist_dir}")
+        logger.info("Плейлист '%s' скачан (%s)", playlist_name, url)
 
     def download_artist(self, url):
         """Скачивает все треки и альбомы артиста"""
         pattern = r"artist/(\d+)"
         match = re.search(pattern, url)
         if not match:
+            logger.error("Неверная ссылка на артиста: %s", url)
             print("Неверная ссылка на артиста")
             return
 
@@ -192,6 +209,7 @@ class ContentDownloader:
             artist_name = artist.name
 
             print(f"Скачиваю треки артиста: {artist_name}")
+            logger.info("Скачивание артиста '%s' (%s)", artist_name, url)
 
             safe_artist_name = sanitize_filename(artist_name)
             artist_dir = os.path.join(self.config.DOWNLOAD_DIR, "artists", safe_artist_name)
@@ -201,6 +219,7 @@ class ContentDownloader:
 
             if albums and hasattr(albums, 'albums'):
                 print(f"Найдено альбомов: {len(albums.albums)}")
+                logger.info("Найдено альбомов артиста %s: %s", artist_name, len(albums.albums))
 
                 for album in albums.albums:
                     try:
@@ -248,8 +267,10 @@ class ContentDownloader:
                                     pbar.update(1)
 
                             print(f"Альбом '{album_name}' скачан")
+                            logger.info("Альбом '%s' артиста '%s' скачан", album_name, artist_name)
 
                     except Exception as e:
+                        logger.warning("Ошибка при скачивании альбома %s: %s", album.title, e)
                         print(f"Ошибка при скачивании альбома {album.title}: {e}")
                         continue
 
@@ -258,6 +279,7 @@ class ContentDownloader:
 
             if tracks and hasattr(tracks, 'tracks'):
                 print(f"\nНайдено отдельных треков: {len(tracks.tracks)}")
+                logger.info("Найдено отдельных треков артиста %s: %s", artist_name, len(tracks.tracks))
 
                 singles_dir = os.path.join(artist_dir, "Singles & Other Tracks")
 
@@ -277,11 +299,14 @@ class ContentDownloader:
                             self.track_downloader.download_track(track, singles_dir)
                             pbar.update(1)
                         except Exception as e:
+                            logger.warning("Ошибка при скачивании трека %s: %s", track.title, e)
                             print(f"Ошибка при скачивании трека {track.title}: {e}")
                             pbar.update(1)  # Обновляем прогресс даже при ошибке
                             continue
 
             print(f"\nВсе треки артиста '{artist_name}' успешно скачаны в {artist_dir}")
+            logger.info("Артист '%s' скачан в %s", artist_name, artist_dir)
 
         except Exception as e:
+            logger.exception("Ошибка при получении информации об артисте: %s", e)
             print(f"Ошибка при получении информации об артисте: {e}")

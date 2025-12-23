@@ -1,12 +1,21 @@
+import logging
 from yandex_music import Client
 import config
 from downloader.content_downloader import ContentDownloader
+from utils.logging_setup import setup_logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def main():
     """Главная функция"""
     print("YandexMusicDownloader")
     print("=" * 50)
+
+    # Настраиваем логирование
+    setup_logging(config)
+    logger.info("Приложение запущено")
 
     # Инициализация клиента
     client = Client(config.YANDEX_MUSIC_TOKEN).init()
@@ -23,11 +32,13 @@ def main():
 
     # Создаём загрузчик
     downloader = ContentDownloader(client, config)
+    logger.info("Инициализирован ContentDownloader")
 
     url = input("Введите ссылку на трек, альбом, плейлист или артиста: ").strip()
 
     if not url.startswith('https://music.yandex.ru/'):
         print("Неверная ссылка. Должна начинаться с https://music.yandex.ru/")
+        logger.error("Неверная ссылка: %s", url)
         return
 
     # Определяем тип контента и скачиваем
@@ -40,6 +51,7 @@ def main():
     elif 'artist' in url:
         downloader.download_artist(url)
     else:
+        logger.error("Неверная ссылка. Поддерживаются треки, альбомы, плейлисты и артисты.")
         print("Неверная ссылка. Поддерживаются треки, альбомы, плейлисты и артисты.")
 
 
