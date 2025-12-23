@@ -28,3 +28,7 @@ LOG_LEVEL = "INFO"
 METADATA_CACHE_ENABLED = True
 METADATA_CACHE_FILE = "cache/metadata.json"
 METADATA_CACHE_TTL_HOURS = 24
+
+# Многопоточность
+# Количество одновременных загрузок (1 — без многопоточности)
+MAX_CONCURRENT_DOWNLOADS = 4

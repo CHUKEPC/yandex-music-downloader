@@ -1,6 +1,7 @@
 import json
 import os
 import time
+import threading
 from typing import Any, Dict, Optional
 
 
@@ -11,6 +12,7 @@ class MetadataCache:
         self.cache_file = cache_file
         self.ttl_seconds = ttl_hours * 3600 if ttl_hours else 0
         self._cache: Dict[str, Dict[str, Any]] = {}
+        self._lock = threading.Lock()
         self._ensure_dir()
         self._load()
 
@@ -31,6 +33,10 @@ class MetadataCache:
             self._cache = {}
 
     def _save(self) -> None:
+        with self._lock:
+            self._save_unlocked()
+
+    def _save_unlocked(self) -> None:
         try:
             with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(self._cache, f, ensure_ascii=False, indent=2)
@@ -62,20 +68,22 @@ class MetadataCache:
         return "|".join(parts)
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
-        entry = self._cache.get(key)
-        if not entry:
-            return None
+        with self._lock:
+            entry = self._cache.get(key)
+            if not entry:
+                return None
 
-        ts = entry.get("ts", 0)
-        if self._is_expired(ts):
-            # Удаляем протухшие данные
-            self._cache.pop(key, None)
-            self._save()
-            return None
+            ts = entry.get("ts", 0)
+            if self._is_expired(ts):
+                # Удаляем протухшие данные
+                self._cache.pop(key, None)
+                self._save_unlocked()
+                return None
 
-        metadata = entry.get("metadata")
-        return dict(metadata) if isinstance(metadata, dict) else None
+            metadata = entry.get("metadata")
+            return dict(metadata) if isinstance(metadata, dict) else None
 
     def set(self, key: str, metadata: Dict[str, Any]) -> None:
-        self._cache[key] = {"metadata": metadata, "ts": time.time()}
-        self._save()
+        with self._lock:
+            self._cache[key] = {"metadata": metadata, "ts": time.time()}
+            self._save_unlocked()
