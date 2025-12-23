@@ -13,6 +13,7 @@ from Crypto.Cipher import AES
 from tqdm import tqdm
 
 from utils.file_utils import sanitize_filename, detect_audio_format
+from utils.metadata_cache import MetadataCache
 from audio.audio_processor import AudioProcessor, UnsupportedAudioFormatError
 from yandex_music.utils.sign_request import DEFAULT_SIGN_KEY
 
@@ -26,9 +27,15 @@ class TrackDownloader:
     # Секретный ключ для получения FLAC
     SECRET = DEFAULT_SIGN_KEY
 
-    def __init__(self, client, audio_quality="hq"):
+    def __init__(self, client, config):
         self.client = client
-        self.audio_quality = audio_quality
+        self.audio_quality = getattr(config, "AUDIO_QUALITY", "hq")
+        if getattr(config, "METADATA_CACHE_ENABLED", False):
+            cache_file = getattr(config, "METADATA_CACHE_FILE", "cache/metadata.json")
+            ttl_hours = getattr(config, "METADATA_CACHE_TTL_HOURS", 24)
+            self.metadata_cache = MetadataCache(cache_file, ttl_hours)
+        else:
+            self.metadata_cache = None
 
     def _download_file_with_progress(self, url, file_path, desc="Скачивание"):
         """Скачивает файл с отображением прогресса"""
@@ -384,7 +391,15 @@ class TrackDownloader:
 
         # Применяем метаданные
         try:
-            AudioProcessor.process_audio(temp_file_path, track, cover_content, album_name, total_tracks, total_discs)
+            AudioProcessor.process_audio(
+                temp_file_path,
+                track,
+                cover_content,
+                album_name,
+                total_tracks,
+                total_discs,
+                metadata_cache=self.metadata_cache,
+            )
         except UnsupportedAudioFormatError as e:
             logger.error("Неподдерживаемый формат: %s", e)
             print(f"Ошибка: {e}")

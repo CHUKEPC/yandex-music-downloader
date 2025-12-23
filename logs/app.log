@@ -1,0 +1,7 @@
+2025-12-23 15:04:05,497 [INFO] __main__: Приложение запущено
+2025-12-23 15:04:05,886 [INFO] __main__: Инициализирован ContentDownloader
+2025-12-23 15:04:08,373 [INFO] downloader.content_downloader: Скачивание артиста 'MORGENSHTERN' (https://music.yandex.ru/artist/5781113)
+2025-12-23 15:04:08,631 [INFO] downloader.content_downloader: Найдено альбомов артиста MORGENSHTERN: 54
+2025-12-23 15:04:08,954 [INFO] downloader.track_downloader: Начало скачивания: MORGENSHTERN - КРАСНЫЙ ФЛАГ (качество: lossless)
+2025-12-23 15:04:27,306 [INFO] downloader.track_downloader: Сохранено: music\artists\MORGENSHTERN\ALISHER\MORGENSHTERN - КРАСНЫЙ ФЛАГ.m4a
+2025-12-23 15:04:27,307 [INFO] downloader.track_downloader: Начало скачивания: MORGENSHTERN - ДОМ (Лондон, Прага, Ницца) (качество: lossless)

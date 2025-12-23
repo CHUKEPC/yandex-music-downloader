@@ -1,6 +1,24 @@
-def extract_metadata(track, album_name=None, total_tracks=None, total_discs=None):
-    """Извлекает все доступные метаданные из объекта track"""
+from typing import Optional
+
+
+def extract_metadata(
+    track,
+    album_name: Optional[str] = None,
+    total_tracks: Optional[int] = None,
+    total_discs: Optional[int] = None,
+    metadata_cache=None,
+):
+    """Извлекает все доступные метаданные из объекта track с кэшированием"""
     metadata = {}
+    cache_key = None
+
+    # Ключ кэша строим только если есть track.id
+    if metadata_cache and hasattr(track, "id"):
+        version = getattr(track, "version", None)
+        cache_key = metadata_cache.make_key(track.id, album_name, total_tracks, total_discs, version)
+        cached = metadata_cache.get(cache_key)
+        if cached:
+            return cached
 
     try:
         # Основные данные
@@ -103,5 +121,9 @@ def extract_metadata(track, album_name=None, total_tracks=None, total_discs=None
 
     except Exception as e:
         print(f"Предупреждение: ошибка при извлечении некоторых метаданных: {e}")
+
+    # Сохраняем в кэш, если он доступен
+    if metadata_cache and cache_key:
+        metadata_cache.set(cache_key, dict(metadata))
 
     return metadata

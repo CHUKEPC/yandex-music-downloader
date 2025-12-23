@@ -18,7 +18,7 @@ class ContentDownloader:
     def __init__(self, client, config):
         self.client = client
         self.config = config
-        self.track_downloader = TrackDownloader(client, config.AUDIO_QUALITY)
+        self.track_downloader = TrackDownloader(client, config)
 
     def download_single_track(self, url):
         """Скачивает один трек"""

@@ -23,3 +23,8 @@ AUDIO_QUALITY = "hq"
 LOGGING_ENABLED = True
 LOG_FILE = "logs/app.log"
 LOG_LEVEL = "INFO"
+
+# Кэширование метаданных
+METADATA_CACHE_ENABLED = True
+METADATA_CACHE_FILE = "cache/metadata.json"
+METADATA_CACHE_TTL_HOURS = 24

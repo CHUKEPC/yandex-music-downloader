@@ -136,7 +136,16 @@ class AudioProcessor:
         audio['covr'] = [MP4Cover(cover_data, imageformat=MP4Cover.FORMAT_JPEG)]
 
     @classmethod
-    def process_audio(cls, temp_file_path, track, downloaded_cover, album_name=None, total_tracks=None, total_discs=None):
+    def process_audio(
+        cls,
+        temp_file_path,
+        track,
+        downloaded_cover,
+        album_name=None,
+        total_tracks=None,
+        total_discs=None,
+        metadata_cache=None,
+    ):
         """Применяет все доступные теги и обложку к аудио файлу"""
         file_extension = os.path.splitext(temp_file_path)[1].lower()
 
@@ -161,7 +170,13 @@ class AudioProcessor:
             audio.delete()
 
         # Извлекаем метаданные
-        metadata = extract_metadata(track, album_name, total_tracks, total_discs)
+        metadata = extract_metadata(
+            track,
+            album_name=album_name,
+            total_tracks=total_tracks,
+            total_discs=total_discs,
+            metadata_cache=metadata_cache,
+        )
 
         # Применяем теги в зависимости от формата
         if isinstance(audio, MP3):
