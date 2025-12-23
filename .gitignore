@@ -4,6 +4,9 @@ config.py
 # Скачанная музыка
 music/
 
+# Кэш
+cache/
+
 # Python
 __pycache__/
 *.py[cod]
